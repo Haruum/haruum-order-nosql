@@ -11,12 +11,16 @@ class LaundryOrder(models.Model):
     )
 
     date_created = models.DateTimeField(auto_now_add=True)
-    transaction_amount = models.FloatField()
-    delivery_address = models.TextField()
+    transaction_amount = models.FloatField(null=True)
+    pickup_delivery_address = models.TextField()
     owning_customer_email = models.EmailField()
     assigned_outlet_email = models.EmailField()
     status_id = models.UUIDField(default=uuid.uuid4)
     payment_method_id = models.UUIDField(default=uuid.uuid4)
+
+    def set_transaction_amount(self, transaction_amount):
+        self.transaction_amount = transaction_amount
+        self.save()
 
 
 class LaundryProgressStatus(models.Model):

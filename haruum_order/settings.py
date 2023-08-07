@@ -167,3 +167,12 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+OUTLET_APPLICATION_URL = 'http://localhost:8000'
+OUTLET_SERVICE_CATEGORIES_URL = f'{OUTLET_APPLICATION_URL}/search/outlet/services/?email='
+OUTLET_ORDER_REGISTRATION_URL = f'{OUTLET_APPLICATION_URL}/order/create/'
+OUTLET_CHECK_EXISTENCE_URL = f'{OUTLET_APPLICATION_URL}/user/check-exist/?email='
+
+
+CUSTOMER_APPLICATION_URL = 'http://localhost:8001'
+CUSTOMER_CHECK_EXISTENCE_URL = f'{CUSTOMER_APPLICATION_URL}/user/check-exist/?email='

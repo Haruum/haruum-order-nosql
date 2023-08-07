@@ -1,0 +1,6 @@
+[
+  {
+    "model": "order.laundryprogressstatus",
+    "name" : "received"
+  }
+]
