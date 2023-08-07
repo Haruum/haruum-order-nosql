@@ -13,7 +13,7 @@ from ..models import LaundryOrder, LaundryOrderReceipt
 import requests
 
 
-def get_service_categories_of_outlet(outlet_email) -> List:
+def get_service_categories_of_outlet(outlet_email: str) -> List:
     """
     Fetch the service categories provided by an outlet
     """
@@ -34,7 +34,7 @@ def get_service_categories_of_outlet(outlet_email) -> List:
         raise FailedToFetchException('Failed to fetch outlet services')
 
 
-def validate_single_ordered_item(order_item_datum, service_categories_id):
+def validate_single_ordered_item(order_item_datum: dict, service_categories_id: List[dict]):
     if item_category_id := order_item_datum.get('category_id') not in service_categories_id:
         raise InvalidRequestException(f'Category ID {item_category_id} does not exist')
 
@@ -53,7 +53,7 @@ def validate_ordered_items(outlet_service_categories: List[dict], order_item_dat
         validate_single_ordered_item(order_item_datum, service_categories_id)
 
 
-def validate_customer_existence(customer_email):
+def validate_customer_existence(customer_email: str):
     validation_url = f'{CUSTOMER_CHECK_EXISTENCE_URL}{customer_email}'
 
     try:
@@ -70,7 +70,7 @@ def validate_customer_existence(customer_email):
         raise FailedToFetchException('Failed to validate customer existence')
 
 
-def validate_outlet_existence(outlet_email):
+def validate_outlet_existence(outlet_email: str):
     validation_url = f'{OUTLET_CHECK_EXISTENCE_URL}{outlet_email}'
 
     try:
@@ -104,7 +104,7 @@ def validate_order_creation_data(request_data: dict):
     validate_outlet_existence(request_data.get('assigned_outlet_email'))
 
 
-def get_category_price(outlet_service_categories, category_id):
+def get_category_price(outlet_service_categories: list, category_id: str):
     return list(
         filter(
             lambda category_data: category_data.get('id') == category_id,
@@ -113,7 +113,7 @@ def get_category_price(outlet_service_categories, category_id):
     )[0].get('item_price')
 
 
-def register_order(request_data, outlet_service_categories):
+def register_order(request_data: dict, outlet_service_categories: list):
     pickup_delivery_address = request_data.get('pickup_delivery_address')
     owning_customer_email = request_data.get('customer_email')
     assigned_outlet_email = request_data.get('assigned_outlet_email')
@@ -148,7 +148,7 @@ def register_order(request_data, outlet_service_categories):
     laundry_order.set_transaction_amount(transaction_amount)
 
 
-def increase_outlet_workload(outlet_email):
+def increase_outlet_workload(outlet_email: str):
     """
     Send request to increase outlet workload
     """
@@ -174,6 +174,11 @@ def create_order(request_data: dict):
     validate_ordered_items(outlet_service_categories, request_data.get('ordered_items'))
     register_order(request_data, outlet_service_categories)
     increase_outlet_workload(request_data.get('assigned_outlet_email'))
+
+
+def get_laundry_orders_of_outlet(request_data: dict):
+    return LaundryOrder.objects.filter(assigned_outlet_email=request_data.get('email'))
+
 
 
 

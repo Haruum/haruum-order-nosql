@@ -1,4 +1,5 @@
 from django.db import models
+from rest_framework import serializers
 import uuid
 
 
@@ -21,6 +22,37 @@ class LaundryOrder(models.Model):
     def set_transaction_amount(self, transaction_amount):
         self.transaction_amount = transaction_amount
         self.save()
+
+    def get_status_id(self):
+        return self.status_id
+
+    def get_payment_method_id(self):
+        return self.payment_method_id
+
+
+class LaundryOrderSerializer(serializers.ModelSerializer):
+    status_name = serializers.SerializerMethodField('get_status_name')
+    payment_method_name = serializers.SerializerMethodField('get_payment_method_name')
+
+    def get_status_name(self, laundry_order: LaundryOrder):
+        return LaundryProgressStatus.objects.get(id=laundry_order.get_status_id()).name
+
+    def get_payment_method_name(self, laundry_order: LaundryOrder):
+        return PaymentMethod.objects.get(id=laundry_order.get_payment_method_id()).name
+
+    class Meta:
+        model = LaundryOrder
+        fields = [
+            'date_created',
+            'transaction_amount',
+            'pickup_delivery_address',
+            'owning_customer_email',
+            'assigned_outlet_email',
+            'status_id',
+            'status_name',
+            'payment_method_id',
+            'payment_method_name'
+        ]
 
 
 class LaundryProgressStatus(models.Model):
