@@ -1,13 +1,16 @@
+from django.core.exceptions import ObjectDoesNotExist
+from haruum_order import utils as haruum_order_utils
+from haruum_order.decorators import catch_exception_and_convert_to_invalid_request_decorator
+from haruum_order.exceptions import FailedToFetchException, InvalidRequestException
 from haruum_order.settings import (
     OUTLET_SERVICE_CATEGORIES_URL,
     OUTLET_ORDER_REGISTRATION_URL,
     OUTLET_CHECK_EXISTENCE_URL,
     CUSTOMER_CHECK_EXISTENCE_URL,
 )
-from haruum_order.exceptions import FailedToFetchException, InvalidRequestException
 from rest_framework import status
-from order.services import utils
 from typing import List
+from . import utils
 from ..models import LaundryOrder, LaundryOrderReceipt
 
 import requests
@@ -47,7 +50,7 @@ def validate_ordered_items(outlet_service_categories: List[dict], order_item_dat
     1. Validate category_id exists
     2. Validate quantity is an integer
     """
-    service_categories_id = map(lambda service_category: service_category.get('id'), outlet_service_categories)
+    service_categories_id = list(map(lambda service_category: service_category.get('id'), outlet_service_categories))
 
     for order_item_datum in order_item_data:
         validate_single_ordered_item(order_item_datum, service_categories_id)
@@ -90,6 +93,9 @@ def validate_outlet_existence(outlet_email: str):
 def validate_order_creation_data(request_data: dict):
     if not isinstance(request_data.get('pickup_delivery_address'), str):
         raise InvalidRequestException('Pickup/Delivery address must be a string')
+
+    if not haruum_order_utils.is_valid_uuid_string(request_data.get('payment_method_id')):
+        raise InvalidRequestException('Payment method ID must be a valid UUID string')
 
     if not utils.payment_method_of_id_exists(request_data.get('payment_method_id')):
         raise InvalidRequestException('Payment method with id does not exist')
@@ -180,6 +186,32 @@ def get_laundry_orders_of_outlet(request_data: dict):
     return LaundryOrder.objects.filter(assigned_outlet_email=request_data.get('email'))
 
 
+def validate_get_laundry_order_outlet_request(request_data):
+    if not haruum_order_utils.is_valid_uuid_string(request_data.get('laundry_order_id')):
+        raise InvalidRequestException('Laundry Order ID must be a valid UUID string')
 
 
+@catch_exception_and_convert_to_invalid_request_decorator((ObjectDoesNotExist,))
+def get_laundry_order(request_data):
+    validate_get_laundry_order_outlet_request(request_data)
+    return utils.get_laundry_order_from_id(request_data.get('laundry_order_id'))
 
+
+def get_active_laundry_orders_of_customer(request_data: dict):
+    returned_progress_status = utils.get_progress_status_from_name('returned')
+    customer_orders = LaundryOrder.objects.filter(owning_customer_email=request_data.get('email'))
+    active_customer_orders = list(
+        filter(
+            lambda order: order.status_id != returned_progress_status.get_id(),
+            customer_orders)
+    )
+
+    return active_customer_orders
+
+
+def get_completed_laundry_orders_of_customer(request_data: dict):
+    returned_progress_status = utils.get_progress_status_from_name('returned')
+    customer_orders = LaundryOrder.objects.filter(owning_customer_email=request_data.get('email'))
+    completed_customer_orders = customer_orders.filter(status_id=returned_progress_status.get_id())
+
+    return completed_customer_orders

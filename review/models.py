@@ -1,4 +1,5 @@
 from django.db import models
+from rest_framework import serializers
 import uuid
 
 
@@ -15,3 +16,7 @@ class Review(models.Model):
     comment = models.TextField(null=True)
 
 
+class ReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Review
+        fields = '__all__'

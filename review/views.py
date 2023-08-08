@@ -1,3 +1,44 @@
-from django.shortcuts import render
+from django.db import transaction
+from django.views.decorators.http import require_POST, require_GET
+from rest_framework.response import Response
+from rest_framework.decorators import api_view
+from .services import review
+from .models import ReviewSerializer
+import json
 
-# Create your views here.
+
+@require_POST
+@api_view(['POST'])
+@transaction.atomic()
+def serve_create_review_for_order(request):
+    """
+    This view registers a review for a laundry order.
+    ---------------------------------------------
+    request data must contain:
+    laundry_order_id: UUID string
+    rating: integer
+    comment: string
+    """
+    request_data = json.loads(request.body.decode('utf-8'))
+    review.create_review_for_order(request_data)
+    response_data = {'message': 'Review for order is created successfully'}
+    return Response(data=response_data)
+
+
+@require_GET
+@api_view(['GET'])
+def serve_get_reviews_of_outlet(request):
+    """
+    This view returns the list of reviews for a
+    laundry outlet.
+    ---------------------------------------------
+    request param must contain:
+    email
+    """
+    request_data = request.GET
+    outlet_reviews = review.get_reviews_of_outlet(request_data)
+    response_data = ReviewSerializer(outlet_reviews, many=True).data
+    return Response(data=response_data)
+
+
+
