@@ -14,7 +14,7 @@ import json
 def serve_create_order(request):
     """
     This view serves as the endpoint to create
-     an order.
+    an order.
     ---------------------------------------------
     request data must contain:
     customer_email: string

@@ -38,8 +38,8 @@ def get_service_categories_of_outlet(outlet_email: str) -> List:
 
 
 def validate_single_ordered_item(order_item_datum: dict, service_categories_id: List[dict]):
-    if item_category_id := order_item_datum.get('category_id') not in service_categories_id:
-        raise InvalidRequestException(f'Category ID {item_category_id} does not exist')
+    if order_item_datum.get('category_id') not in service_categories_id:
+        raise InvalidRequestException(f'Category ID {order_item_datum.get("category_id")} does not exist')
 
     if not isinstance(order_item_datum.get('quantity'), int):
         raise InvalidRequestException('Quantity must be an integer')
@@ -159,19 +159,7 @@ def increase_outlet_workload(outlet_email: str):
     Send request to increase outlet workload
     """
     outlet_data = {'laundry_outlet_email': outlet_email}
-
-    try:
-        increase_outlet_response = requests.post(OUTLET_ORDER_REGISTRATION_URL, json=outlet_data)
-        response_data = increase_outlet_response.json()
-
-        if increase_outlet_response.status_code == status.HTTP_400_BAD_REQUEST:
-            raise InvalidRequestException(response_data.get('message'))
-
-        if increase_outlet_response.status_code != status.HTTP_200_OK:
-            raise FailedToFetchException(response_data.get('message'))
-
-    except requests.exceptions.RequestException:
-        raise FailedToFetchException('Failed to communicate with outlet service')
+    haruum_order_utils.request_post_and_return_response(outlet_data, OUTLET_ORDER_REGISTRATION_URL)
 
 
 def create_order(request_data: dict):
