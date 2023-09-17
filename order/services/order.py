@@ -157,8 +157,8 @@ def generate_laundry_order_from_request(request_data: dict, converted_ordered_it
     return laundry_order
 
 
-def register_order(laundry_order: LaundryOrder, database_session):
-    order_repository.create_order(laundry_order, database_session=database_session)
+def register_order(laundry_order: LaundryOrder):
+    order_repository.create_order(laundry_order)
 
 
 def increase_outlet_workload(outlet_email: str):
@@ -169,14 +169,14 @@ def increase_outlet_workload(outlet_email: str):
     haruum_order_utils.request_post_and_return_response(outlet_data, OUTLET_ORDER_REGISTRATION_URL)
 
 
-def create_order(request_data: dict, database_session):
+def create_order(request_data: dict):
     validate_order_creation_data(request_data)
     outlet_service_categories = get_service_categories_of_outlet(request_data.get('assigned_outlet_email'))
     validate_ordered_items(request_data.get('ordered_items'), outlet_service_categories)
     ordered_items = convert_ordered_items(request_data.get('ordered_items'))
     generate_price_for_items(ordered_items, outlet_service_categories)
     laundry_order = generate_laundry_order_from_request(request_data, ordered_items)
-    register_order(laundry_order, database_session=database_session)
+    register_order(laundry_order)
     increase_outlet_workload(request_data.get('assigned_outlet_email'))
 
 

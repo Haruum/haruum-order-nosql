@@ -5,8 +5,8 @@ from haruum_order.collections import ORDER
 from ..dto.LaundryOrder import LaundryOrder
 
 
-def create_order(order_dto: LaundryOrder, database_session):
-    DATABASE[ORDER].insert_one(order_dto.get_all(), session=database_session)
+def create_order(order_dto: LaundryOrder):
+    DATABASE[ORDER].insert_one(order_dto.get_all())
     return order_dto
 
 

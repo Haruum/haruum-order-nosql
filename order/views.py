@@ -1,5 +1,4 @@
 from django.views.decorators.http import require_POST, require_GET
-from haruum_order.decorators import transaction_atomic
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .serializers.LaundryOrderSerializer import LaundryOrderSerializer
@@ -11,8 +10,7 @@ import json
 
 @require_POST
 @api_view(['POST'])
-@transaction_atomic()
-def serve_create_order(database_session, request):
+def serve_create_order(request):
     """
     This view serves as the endpoint to create
     an order.
@@ -31,7 +29,7 @@ def serve_create_order(database_session, request):
     ]
     """
     request_data = json.loads(request.body.decode('utf-8'))
-    order.create_order(request_data, database_session=database_session)
+    order.create_order(request_data)
     response_data = {'message': 'Order is successfully registered'}
     return Response(data=response_data)
 
