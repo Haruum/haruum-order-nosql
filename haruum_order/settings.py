@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 from datetime import timedelta
 from pathlib import Path
+from pymongo import MongoClient
 import dj_database_url
 import os
 
@@ -79,53 +80,13 @@ TEMPLATES = [
 ]
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
     'EXCEPTION_HANDLER': 'haruum_order.exception_config.custom_exception_handler',
-}
-
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=100),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': False,
-
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
-    'VERIFYING_KEY': None,
-    'AUDIENCE': None,
-    'ISSUER': None,
-    'JWK_URL': None,
-    'LEEWAY': 0,
-
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-    'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
-
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
-    'TOKEN_TYPE_CLAIM': 'token_type',
-    'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
-
-    'JTI_CLAIM': 'jti',
-
-    'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
-    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
-    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
 
 WSGI_APPLICATION = 'haruum_order.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
-DATABASES = {
-    'default': dj_database_url.config(conn_max_age=600)
-}
+MONGO_CLIENT = MongoClient('localhost', 27017)
+DATABASE = MONGO_CLIENT['haruum_nosql']
 
 
 # Password validation
@@ -173,6 +134,7 @@ OUTLET_APPLICATION_URL = 'http://localhost:8000'
 OUTLET_SERVICE_CATEGORIES_URL = f'{OUTLET_APPLICATION_URL}/search/outlet/services/?email='
 OUTLET_ORDER_REGISTRATION_URL = f'{OUTLET_APPLICATION_URL}/order/create/'
 OUTLET_ORDER_COMPLETION_URL = f'{OUTLET_APPLICATION_URL}/order/complete/'
+OUTLET_RATING_UPDATE_URL = f'{OUTLET_APPLICATION_URL}/order/rating/'
 OUTLET_CHECK_EXISTENCE_URL = f'{OUTLET_APPLICATION_URL}/user/check-exist/?email='
 
 

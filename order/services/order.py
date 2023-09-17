@@ -10,9 +10,13 @@ from haruum_order.settings import (
 )
 from rest_framework import status
 from typing import List
-from . import utils
-from ..models import LaundryOrder, LaundryOrderReceipt
-
+from ..dto.LaundryOrder import LaundryOrder
+from ..dto.LaundryOrderReceipt import LaundryOrderReceipt
+from ..repositories import (
+    payment as payment_repository,
+    order as order_repository
+)
+from status.repositories import status as status_repository
 import requests
 
 
@@ -37,23 +41,31 @@ def get_service_categories_of_outlet(outlet_email: str) -> List:
         raise FailedToFetchException('Failed to fetch outlet services')
 
 
-def validate_single_ordered_item(order_item_datum: dict, service_categories_id: List[dict]):
-    if order_item_datum.get('category_id') not in service_categories_id:
+def find_matching_category(category_id, outlet_service_categories):
+    matching_category = [category for category in outlet_service_categories if category.get('id') == category_id]
+
+    if len(matching_category) > 0:
+        return matching_category[0]
+
+    else:
+        return None
+
+
+def validate_single_ordered_item(order_item_datum: dict, outlet_service_categories: List[dict]):
+    if find_matching_category(order_item_datum.get('category_id'), outlet_service_categories) is None:
         raise InvalidRequestException(f'Category ID {order_item_datum.get("category_id")} does not exist')
 
     if not isinstance(order_item_datum.get('quantity'), int):
         raise InvalidRequestException('Quantity must be an integer')
 
 
-def validate_ordered_items(outlet_service_categories: List[dict], order_item_data):
+def validate_ordered_items(order_item_data, outlet_service_categories):
     """
     1. Validate category_id exists
     2. Validate quantity is an integer
     """
-    service_categories_id = list(map(lambda service_category: service_category.get('id'), outlet_service_categories))
-
     for order_item_datum in order_item_data:
-        validate_single_ordered_item(order_item_datum, service_categories_id)
+        validate_single_ordered_item(order_item_datum, outlet_service_categories)
 
 
 def validate_customer_existence(customer_email: str):
@@ -97,7 +109,7 @@ def validate_order_creation_data(request_data: dict):
     if not haruum_order_utils.is_valid_uuid_string(request_data.get('payment_method_id')):
         raise InvalidRequestException('Payment method ID must be a valid UUID string')
 
-    if not utils.payment_method_of_id_exists(request_data.get('payment_method_id')):
+    if not payment_repository.payment_method_with_id_exists(request_data.get('payment_method_id')):
         raise InvalidRequestException('Payment method with id does not exist')
 
     if not isinstance(request_data.get('ordered_items'), list):
@@ -110,48 +122,43 @@ def validate_order_creation_data(request_data: dict):
     validate_outlet_existence(request_data.get('assigned_outlet_email'))
 
 
-def get_category_price(outlet_service_categories: list, category_id: str):
-    return list(
-        filter(
-            lambda category_data: category_data.get('id') == category_id,
-            outlet_service_categories
-        )
-    )[0].get('item_price')
+def convert_ordered_items(ordered_items: list):
+    converted_ordered_items = []
+    for item in ordered_items:
+        receipt = LaundryOrderReceipt()
+        receipt.set_values_from_request(item)
+        converted_ordered_items.append(receipt)
+
+    return converted_ordered_items
 
 
-def register_order(request_data: dict, outlet_service_categories: list):
-    pickup_delivery_address = request_data.get('pickup_delivery_address')
-    owning_customer_email = request_data.get('customer_email')
-    assigned_outlet_email = request_data.get('assigned_outlet_email')
-    payment_method_id = request_data.get('payment_method_id')
-    pending_status_id = utils.get_progress_status_from_name('pending').id
+def get_category_price(category_id: str, outlet_service_categories: list):
+    return find_matching_category(category_id, outlet_service_categories).get('item_price')
 
-    laundry_order = LaundryOrder.objects.create(
-        pickup_delivery_address=pickup_delivery_address,
-        owning_customer_email=owning_customer_email,
-        assigned_outlet_email=assigned_outlet_email,
-        payment_method_id=payment_method_id,
-        status_id=pending_status_id
-    )
 
-    ordered_items_data = request_data.get('ordered_items')
-    transaction_amount = 0
-    for ordered_item in ordered_items_data:
-        category_id = ordered_item.get('category_id')
-        quantity = ordered_item.get('quantity')
-        category_price = get_category_price(outlet_service_categories, category_id)
-        subtotal = quantity * category_price
+def generate_price_for_items(ordered_items: List[LaundryOrderReceipt], outlet_service_categories: list):
+    for ordered_item in ordered_items:
+        category_price = get_category_price(ordered_item.get_category_id(), outlet_service_categories)
+        ordered_item.set_item_price(category_price)
 
-        LaundryOrderReceipt.objects.create(
-            quantity=quantity,
-            subtotal=subtotal,
-            item_category_provided_id=category_id,
-            laundry_order_id=laundry_order.id
-        )
 
-        transaction_amount += subtotal
+def generate_laundry_order_from_request(request_data: dict, converted_ordered_items: List[LaundryOrderReceipt]):
+    serialized_ordered_items = [
+        converted_ordered_item.get_all()
+        for converted_ordered_item in converted_ordered_items
+    ]
 
-    laundry_order.set_transaction_amount(transaction_amount)
+    laundry_order = LaundryOrder()
+    laundry_order.set_values_from_request(request_data)
+    laundry_order.set_laundry_receipts(serialized_ordered_items)
+
+    pending_status = status_repository.get_status_by_name('pending')
+    laundry_order.set_status_id(pending_status.get_id())
+    return laundry_order
+
+
+def register_order(laundry_order: LaundryOrder, database_session):
+    order_repository.create_order(laundry_order, database_session=database_session)
 
 
 def increase_outlet_workload(outlet_email: str):
@@ -162,16 +169,19 @@ def increase_outlet_workload(outlet_email: str):
     haruum_order_utils.request_post_and_return_response(outlet_data, OUTLET_ORDER_REGISTRATION_URL)
 
 
-def create_order(request_data: dict):
+def create_order(request_data: dict, database_session):
     validate_order_creation_data(request_data)
     outlet_service_categories = get_service_categories_of_outlet(request_data.get('assigned_outlet_email'))
-    validate_ordered_items(outlet_service_categories, request_data.get('ordered_items'))
-    register_order(request_data, outlet_service_categories)
+    validate_ordered_items(request_data.get('ordered_items'), outlet_service_categories)
+    ordered_items = convert_ordered_items(request_data.get('ordered_items'))
+    generate_price_for_items(ordered_items, outlet_service_categories)
+    laundry_order = generate_laundry_order_from_request(request_data, ordered_items)
+    register_order(laundry_order, database_session=database_session)
     increase_outlet_workload(request_data.get('assigned_outlet_email'))
 
 
 def get_laundry_orders_of_outlet(request_data: dict):
-    return LaundryOrder.objects.filter(assigned_outlet_email=request_data.get('email'))
+    return order_repository.get_orders_of_outlet(request_data.get('email'))
 
 
 def validate_get_laundry_order_outlet_request(request_data):
@@ -182,24 +192,24 @@ def validate_get_laundry_order_outlet_request(request_data):
 @catch_exception_and_convert_to_invalid_request_decorator((ObjectDoesNotExist,))
 def get_laundry_order(request_data):
     validate_get_laundry_order_outlet_request(request_data)
-    return utils.get_laundry_order_from_id(request_data.get('laundry_order_id'))
+    return order_repository.get_order_by_id(request_data.get('laundry_order_id'))
 
 
 def get_active_laundry_orders_of_customer(request_data: dict):
-    returned_progress_status = utils.get_progress_status_from_name('returned')
-    customer_orders = LaundryOrder.objects.filter(owning_customer_email=request_data.get('email'))
-    active_customer_orders = list(
-        filter(
-            lambda order: order.status_id != returned_progress_status.get_id(),
-            customer_orders)
+    returned_progress_status = status_repository.get_status_by_name('returned')
+    active_customer_orders = order_repository.get_active_laundry_orders_of_a_customer(
+        request_data.get('email'),
+        returned_progress_status.get_id()
     )
 
     return active_customer_orders
 
 
 def get_completed_laundry_orders_of_customer(request_data: dict):
-    returned_progress_status = utils.get_progress_status_from_name('returned')
-    customer_orders = LaundryOrder.objects.filter(owning_customer_email=request_data.get('email'))
-    completed_customer_orders = customer_orders.filter(status_id=returned_progress_status.get_id())
+    returned_progress_status = status_repository.get_status_by_name('returned')
+    completed_customer_orders = order_repository.get_completed_laundry_orders_of_a_customer(
+        request_data.get('email'),
+        returned_progress_status.get_id()
+    )
 
     return completed_customer_orders

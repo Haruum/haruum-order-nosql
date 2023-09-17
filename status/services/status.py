@@ -1,18 +1,20 @@
 from django.core.exceptions import ObjectDoesNotExist
 from haruum_order import utils as haruum_order_utils
 from haruum_order.decorators import catch_exception_and_convert_to_invalid_request_decorator
-from haruum_order.exceptions import InvalidRequestException, FailedToFetchException
+from haruum_order.exceptions import InvalidRequestException
 from haruum_order.settings import OUTLET_ORDER_COMPLETION_URL
-from order.models import LaundryProgressStatus, LaundryOrder
-from order.services import utils as order_utils
-from . import utils
+# from order.models import LaundryProgressStatus, LaundryOrder
+from order.dto.LaundryOrder import LaundryOrder
+from order.repositories import order as order_repository
+from ..dto.LaundryProgressStatus import LaundryProgressStatus
+from ..repositories import status as status_repository
 
 
 STATUS_TRANSITION_MESSAGE = 'Order with status {} can only be updated to {}'
 
 
 def get_laundry_progress_status():
-    return LaundryProgressStatus.objects.all()
+    return status_repository.get_all_status()
 
 
 def validate_progress_status_update(request_data):
@@ -22,12 +24,9 @@ def validate_progress_status_update(request_data):
     if not haruum_order_utils.is_valid_uuid_string(request_data.get('status_id')):
         raise InvalidRequestException('Status ID must be a valid UUID string')
 
-    if not utils.laundry_progress_status_exists(request_data.get('status_id')):
-        raise InvalidRequestException(f'Status with ID {request_data.get("status_id")} does not exist')
-
 
 def validate_status_transition(laundry_order: LaundryOrder, new_status: LaundryProgressStatus):
-    current_status = utils.get_laundry_progress_status_by_id(str(laundry_order.get_status_id()))
+    current_status = status_repository.get_status_by_id(laundry_order.get_status_id())
 
     if current_status.get_name() == 'pending' and new_status.get_name() != 'received':
         raise InvalidRequestException(STATUS_TRANSITION_MESSAGE.format('pending', 'received'))
@@ -45,23 +44,29 @@ def validate_status_transition(laundry_order: LaundryOrder, new_status: LaundryP
         raise InvalidRequestException('Returned order can no longer be updated')
 
 
-def register_laundry_progress_new_status(laundry_order: LaundryOrder, progress_status: LaundryProgressStatus):
-    laundry_order.set_status_id(progress_status.id)
+def register_laundry_progress_new_status(laundry_order: LaundryOrder, progress_status: LaundryProgressStatus,
+                                         database_session):
+
+    order_repository.update_order_status(
+        laundry_order.get_id(),
+        progress_status.get_id(),
+        database_session=database_session
+    )
 
 
 def decrease_outlet_workload(laundry_order: LaundryOrder, progress_status: LaundryProgressStatus):
     if progress_status.get_name() == 'returned':
-        outlet_data = {'laundry_outlet_email': laundry_order.get_outlet_email()}
+        outlet_data = {'laundry_outlet_email': laundry_order.get_assigned_outlet_email()}
         haruum_order_utils.request_post_and_return_response(outlet_data, OUTLET_ORDER_COMPLETION_URL)
 
 
 @catch_exception_and_convert_to_invalid_request_decorator((ObjectDoesNotExist,))
-def update_laundry_progress_status(request_data):
+def update_laundry_progress_status(request_data, database_session):
     validate_progress_status_update(request_data)
-    new_progress_status = utils.get_laundry_progress_status_by_id(request_data.get('status_id'))
-    laundry_order = order_utils.get_laundry_order_from_id_thread_safe(request_data.get('laundry_order_id'))
+    new_progress_status = status_repository.get_status_by_id(request_data.get('status_id'))
+    laundry_order = order_repository.get_order_by_id(request_data.get('laundry_order_id'))
     validate_status_transition(laundry_order, new_progress_status)
-    register_laundry_progress_new_status(laundry_order, new_progress_status)
+    register_laundry_progress_new_status(laundry_order, new_progress_status, database_session=database_session)
     decrease_outlet_workload(laundry_order, new_progress_status)
 
 

@@ -1,9 +1,9 @@
-from django.db import transaction
 from django.views.decorators.http import require_GET, require_POST
-from order.models import LaundryProgressStatusSerializer
+from haruum_order.decorators import transaction_atomic
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .services import status
+from .serializers.LaundryProgressStatusSerializer import LaundryProgressStatusSerializer
 import json
 
 
@@ -22,8 +22,8 @@ def serve_get_laundry_progress_statuses(request):
 
 @require_POST
 @api_view(['POST'])
-@transaction.atomic()
-def serve_update_laundry_progress_status(request):
+@transaction_atomic()
+def serve_update_laundry_progress_status(database_session, request):
     """
     This method serves as the endpoint to update laundry order
     progress status.
@@ -36,7 +36,7 @@ def serve_update_laundry_progress_status(request):
     status_id: UUID string
     """
     request_data = json.loads(request.body.decode('utf-8'))
-    status.update_laundry_progress_status(request_data)
+    status.update_laundry_progress_status(request_data, database_session=database_session)
     response_data = {'message': 'Laundry Order status is successfully updated'}
     return Response(data=response_data)
 
