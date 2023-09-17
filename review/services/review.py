@@ -41,15 +41,21 @@ def validate_review_can_be_added_for_order(laundry_order: LaundryOrder):
         raise InvalidRequestException('A review for laundry order has been submitted')
 
 
-def register_review_for_order(laundry_order: LaundryOrder, review_data: dict, database_session):
-    order_repository.update_order_review(
-        laundry_order.get_id(),
-        {
-            'rating': review_data.get('rating'),
-            'comment': review_data.get('comment'),
-        },
-        database_session=database_session
-    )
+def register_review_for_order(laundry_order: LaundryOrder, review_data: dict):
+    try:
+        order_repository.update_order_review(
+            laundry_order.get_id(),
+            {
+                'rating': review_data.get('rating'),
+                'comment': review_data.get('comment'),
+            }
+        )
+
+        update_outlet_rating(laundry_order.get_assigned_outlet_email(), review_data.get('rating'))
+
+    except Exception as exception:
+        order_repository.update_order_review(laundry_order.get_id(), None)
+        raise exception
 
 
 def update_outlet_rating(outlet_email, rating):
@@ -61,12 +67,11 @@ def update_outlet_rating(outlet_email, rating):
 
 
 @catch_exception_and_convert_to_invalid_request_decorator((ObjectDoesNotExist,))
-def create_review_for_order(request_data: dict, database_session):
+def create_review_for_order(request_data: dict):
     validate_review_for_order(request_data)
     laundry_order = order_repository.get_order_by_id(request_data.get('laundry_order_id'))
     validate_review_can_be_added_for_order(laundry_order)
-    register_review_for_order(laundry_order, request_data, database_session=database_session)
-    update_outlet_rating(laundry_order.get_assigned_outlet_email(), request_data.get('rating'))
+    register_review_for_order(laundry_order, request_data)
 
 
 def get_reviews_of_outlet(request_data: dict):

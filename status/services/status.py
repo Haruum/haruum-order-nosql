@@ -44,30 +44,29 @@ def validate_status_transition(laundry_order: LaundryOrder, new_status: LaundryP
         raise InvalidRequestException('Returned order can no longer be updated')
 
 
-def register_laundry_progress_new_status(laundry_order: LaundryOrder, progress_status: LaundryProgressStatus,
-                                         database_session):
-
-    order_repository.update_order_status(
-        laundry_order.get_id(),
-        progress_status.get_id(),
-        database_session=database_session
-    )
-
-
-def decrease_outlet_workload(laundry_order: LaundryOrder, progress_status: LaundryProgressStatus):
+def decrease_outlet_workload(laundry_outlet_email, progress_status: LaundryProgressStatus):
     if progress_status.get_name() == 'returned':
-        outlet_data = {'laundry_outlet_email': laundry_order.get_assigned_outlet_email()}
+        outlet_data = {'laundry_outlet_email': laundry_outlet_email}
         haruum_order_utils.request_post_and_return_response(outlet_data, OUTLET_ORDER_COMPLETION_URL)
 
 
+def register_laundry_progress_new_status(laundry_order: LaundryOrder, new_progress_status: LaundryProgressStatus):
+    try:
+        order_repository.update_order_status(laundry_order.get_id(), new_progress_status.get_id())
+        decrease_outlet_workload(laundry_order.get_assigned_outlet_email(), new_progress_status)
+
+    except Exception as exception:
+        order_repository.update_order_status(laundry_order.get_id(), laundry_order.get_status_id())
+        raise exception
+
+
 @catch_exception_and_convert_to_invalid_request_decorator((ObjectDoesNotExist,))
-def update_laundry_progress_status(request_data, database_session):
+def update_laundry_progress_status(request_data):
     validate_progress_status_update(request_data)
     new_progress_status = status_repository.get_status_by_id(request_data.get('status_id'))
     laundry_order = order_repository.get_order_by_id(request_data.get('laundry_order_id'))
     validate_status_transition(laundry_order, new_progress_status)
-    register_laundry_progress_new_status(laundry_order, new_progress_status, database_session=database_session)
-    decrease_outlet_workload(laundry_order, new_progress_status)
+    register_laundry_progress_new_status(laundry_order, new_progress_status)
 
 
 

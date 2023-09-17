@@ -22,8 +22,7 @@ def serve_get_laundry_progress_statuses(request):
 
 @require_POST
 @api_view(['POST'])
-@transaction_atomic()
-def serve_update_laundry_progress_status(database_session, request):
+def serve_update_laundry_progress_status(request):
     """
     This method serves as the endpoint to update laundry order
     progress status.
@@ -36,7 +35,7 @@ def serve_update_laundry_progress_status(database_session, request):
     status_id: UUID string
     """
     request_data = json.loads(request.body.decode('utf-8'))
-    status.update_laundry_progress_status(request_data, database_session=database_session)
+    status.update_laundry_progress_status(request_data)
     response_data = {'message': 'Laundry Order status is successfully updated'}
     return Response(data=response_data)
 

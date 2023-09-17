@@ -158,7 +158,13 @@ def generate_laundry_order_from_request(request_data: dict, converted_ordered_it
 
 
 def register_order(laundry_order: LaundryOrder):
-    order_repository.create_order(laundry_order)
+    try:
+        order_repository.create_order(laundry_order)
+        increase_outlet_workload(laundry_order.get_assigned_outlet_email())
+
+    except Exception as exception:
+        order_repository.delete_order(laundry_order.get_id())
+        raise exception
 
 
 def increase_outlet_workload(outlet_email: str):
@@ -177,7 +183,6 @@ def create_order(request_data: dict):
     generate_price_for_items(ordered_items, outlet_service_categories)
     laundry_order = generate_laundry_order_from_request(request_data, ordered_items)
     register_order(laundry_order)
-    increase_outlet_workload(request_data.get('assigned_outlet_email'))
 
 
 def get_laundry_orders_of_outlet(request_data: dict):

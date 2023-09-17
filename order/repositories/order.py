@@ -10,20 +10,22 @@ def create_order(order_dto: LaundryOrder):
     return order_dto
 
 
-def update_order_status(order_id, progress_status_id, database_session):
+def update_order_status(order_id, progress_status_id):
     DATABASE[ORDER].update_one(
-        {"id": order_id},
-        {"$set": {"status_id": progress_status_id}},
-        session=database_session,
+        {'id': order_id},
+        {'$set': {'status_id': progress_status_id}}
     )
 
 
-def update_order_review(order_id, review, database_session):
+def update_order_review(order_id, review):
     DATABASE[ORDER].update_one(
-        {"id": order_id},
-        {"$set": {"review": review}},
-        session=database_session
+        {'id': order_id},
+        {'$set': {'review': review}}
     )
+
+
+def delete_order(order_id):
+    DATABASE[ORDER].delete_one({'id': order_id})
 
 
 def get_orders_of_outlet(outlet_email):
