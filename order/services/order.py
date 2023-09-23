@@ -5,7 +5,7 @@ from haruum_order.exceptions import FailedToFetchException, InvalidRequestExcept
 from haruum_order.settings import (
     OUTLET_SERVICE_CATEGORIES_URL,
     OUTLET_ORDER_REGISTRATION_URL,
-    OUTLET_CHECK_EXISTENCE_URL,
+    OUTLET_GET_DATA_URL,
     CUSTOMER_CHECK_EXISTENCE_URL,
 )
 from rest_framework import status
@@ -85,18 +85,20 @@ def validate_customer_existence(customer_email: str):
         raise FailedToFetchException('Failed to validate customer existence')
 
 
-def validate_outlet_existence(outlet_email: str):
-    validation_url = f'{OUTLET_CHECK_EXISTENCE_URL}{outlet_email}'
+def get_outlet_data(outlet_email: str):
+    outlet_data_url = f'{OUTLET_GET_DATA_URL}{outlet_email}'
 
     try:
-        outlet_exists_response = requests.get(validation_url)
-        validation_result = outlet_exists_response.json()
+        outlet_data_response = requests.get(outlet_data_url)
+        outlet_data = outlet_data_response.json()
 
-        if outlet_exists_response.status_code != status.HTTP_200_OK:
-            raise FailedToFetchException(validation_result.get('message'))
+        if outlet_data_response.status_code == status.HTTP_400_BAD_REQUEST:
+            raise InvalidRequestException(outlet_data.get('message'))
 
-        if not validation_result.get('outlet_exists'):
-            raise InvalidRequestException(f'Outlet with email {outlet_email} does not exist')
+        if outlet_data_response.status_code != status.HTTP_200_OK:
+            raise FailedToFetchException(outlet_data.get('message'))
+
+        return outlet_data
 
     except requests.exceptions.RequestException:
         raise FailedToFetchException('Failed to validate outlet existence')
@@ -117,9 +119,6 @@ def validate_order_creation_data(request_data: dict):
 
     if len(request_data.get('ordered_items')) == 0:
         raise InvalidRequestException('Ordered items must not be empty')
-
-    validate_customer_existence(request_data.get('customer_email'))
-    validate_outlet_existence(request_data.get('assigned_outlet_email'))
 
 
 def convert_ordered_items(ordered_items: list):
@@ -160,24 +159,29 @@ def generate_laundry_order_from_request(request_data: dict, converted_ordered_it
 def register_order(laundry_order: LaundryOrder):
     try:
         order_repository.create_order(laundry_order)
-        increase_outlet_workload(laundry_order.get_assigned_outlet_email())
+        increase_outlet_workload(
+            laundry_order.get_assigned_outlet_email(),
+            laundry_order.get_laundry_items_count()
+        )
 
     except Exception as exception:
         order_repository.delete_order(laundry_order.get_id())
         raise exception
 
 
-def increase_outlet_workload(outlet_email: str):
+def increase_outlet_workload(outlet_email: str, order_quantity: int):
     """
     Send request to increase outlet workload
     """
-    outlet_data = {'laundry_outlet_email': outlet_email}
+    outlet_data = {'laundry_outlet_email': outlet_email, 'order_quantity': order_quantity}
     haruum_order_utils.request_post_and_return_response(outlet_data, OUTLET_ORDER_REGISTRATION_URL)
 
 
 def create_order(request_data: dict):
     validate_order_creation_data(request_data)
-    outlet_service_categories = get_service_categories_of_outlet(request_data.get('assigned_outlet_email'))
+    validate_customer_existence(request_data.get('customer_email'))
+    outlet_data = get_outlet_data(request_data.get('assigned_outlet_email'))
+    outlet_service_categories = outlet_data.get('items_provided')
     validate_ordered_items(request_data.get('ordered_items'), outlet_service_categories)
     ordered_items = convert_ordered_items(request_data.get('ordered_items'))
     generate_price_for_items(ordered_items, outlet_service_categories)

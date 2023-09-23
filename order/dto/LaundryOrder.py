@@ -72,6 +72,9 @@ class LaundryOrder:
     def get_laundry_receipts(self):
         return self.laundry_receipts
 
+    def get_laundry_items_count(self):
+        return sum([laundry_receipt.get('quantity') for laundry_receipt in self.laundry_receipts])
+
     def get_review(self):
         return self.review
 

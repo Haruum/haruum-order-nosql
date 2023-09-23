@@ -44,16 +44,20 @@ def validate_status_transition(laundry_order: LaundryOrder, new_status: LaundryP
         raise InvalidRequestException('Returned order can no longer be updated')
 
 
-def decrease_outlet_workload(laundry_outlet_email, progress_status: LaundryProgressStatus):
+def decrease_outlet_workload(laundry_outlet_email, order_quantity: int, progress_status: LaundryProgressStatus):
     if progress_status.get_name() == 'returned':
-        outlet_data = {'laundry_outlet_email': laundry_outlet_email}
+        outlet_data = {'laundry_outlet_email': laundry_outlet_email, 'order_quantity': order_quantity}
         haruum_order_utils.request_post_and_return_response(outlet_data, OUTLET_ORDER_COMPLETION_URL)
 
 
 def register_laundry_progress_new_status(laundry_order: LaundryOrder, new_progress_status: LaundryProgressStatus):
     try:
         order_repository.update_order_status(laundry_order.get_id(), new_progress_status.get_id())
-        decrease_outlet_workload(laundry_order.get_assigned_outlet_email(), new_progress_status)
+        decrease_outlet_workload(
+            laundry_order.get_assigned_outlet_email(),
+            laundry_order.get_laundry_items_count(),
+            new_progress_status
+        )
 
     except Exception as exception:
         order_repository.update_order_status(laundry_order.get_id(), laundry_order.get_status_id())
