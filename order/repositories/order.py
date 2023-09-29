@@ -40,8 +40,8 @@ def get_orders_of_outlet(outlet_email):
     return matching_orders
 
 
-def get_order_by_id(laundry_order_id):
-    found_order_raw = DATABASE[ORDER].find_one({'id': laundry_order_id})
+def get_order_by_id(order_id):
+    found_order_raw = DATABASE[ORDER].find_one({'id': order_id})
 
     if found_order_raw is not None:
         order = LaundryOrder()
@@ -49,7 +49,7 @@ def get_order_by_id(laundry_order_id):
         return order
 
     else:
-        raise ObjectDoesNotExist(f'Laundry order with ID {laundry_order_id} does not exist')
+        raise ObjectDoesNotExist(f'Laundry order with ID {order_id} does not exist')
 
 
 def get_active_laundry_orders_of_a_customer(customer_email, returned_status_id):

@@ -16,8 +16,8 @@ def get_status_by_name(name: str):
         raise ObjectDoesNotExist(f'Status with name {name} does not exist')
 
 
-def get_status_by_id(payment_id: str):
-    found_status_raw = DATABASE[STATUS].find_one({'id': payment_id})
+def get_status_by_id(status_id: str):
+    found_status_raw = DATABASE[STATUS].find_one({'id': status_id})
 
     if found_status_raw is not None:
         status = LaundryProgressStatus()
@@ -25,7 +25,7 @@ def get_status_by_id(payment_id: str):
         return status
 
     else:
-        raise ObjectDoesNotExist(f'Status with ID {id} does not exist')
+        raise ObjectDoesNotExist(f'Status with ID {status_id} does not exist')
 
 
 def get_all_status():

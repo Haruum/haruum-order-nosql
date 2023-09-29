@@ -3,7 +3,6 @@ from haruum_order import utils as haruum_order_utils
 from haruum_order.decorators import catch_exception_and_convert_to_invalid_request_decorator
 from haruum_order.exceptions import InvalidRequestException
 from haruum_order.settings import OUTLET_ORDER_COMPLETION_URL
-# from order.models import LaundryProgressStatus, LaundryOrder
 from order.dto.LaundryOrder import LaundryOrder
 from order.repositories import order as order_repository
 from ..dto.LaundryProgressStatus import LaundryProgressStatus

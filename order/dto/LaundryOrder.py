@@ -14,9 +14,15 @@ class LaundryOrder:
         self.status_id = None
         self.payment_method_id = None
 
-        self.transaction_amount = 0
         self.laundry_receipts = []
         self.review = None
+
+        self.outlet_name = None
+        self.outlet_phone_number = None
+        self.outlet_address = None
+
+        self.customer_name = None
+        self.customer_phone_number = None
 
     def set_values_from_request(self, request_data):
         self.owning_customer_email = request_data.get('customer_email')
@@ -27,7 +33,6 @@ class LaundryOrder:
     def set_values_from_result(self, result):
         self.id = result.get('id')
         self.date_created = result.get('date_created')
-        self.transaction_amount = result.get('transaction_amount')
         self.pickup_delivery_address = result.get('pickup_delivery_address')
         self.owning_customer_email = result.get('owning_customer_email')
         self.assigned_outlet_email = result.get('assigned_outlet_email')
@@ -52,7 +57,7 @@ class LaundryOrder:
         return self.date_created
 
     def get_transaction_amount(self):
-        return self.transaction_amount
+        return sum([laundry_receipt.get('subtotal') for laundry_receipt in self.laundry_receipts])
 
     def get_pickup_delivery_address(self):
         return self.pickup_delivery_address
@@ -80,6 +85,36 @@ class LaundryOrder:
 
     def has_been_reviewed(self):
         return self.review is not None
+
+    def get_customer_name(self):
+        return self.customer_name
+
+    def set_customer_name(self, name):
+        self.customer_name = name
+
+    def get_outlet_name(self):
+        return self.outlet_name
+
+    def set_outlet_name(self, name):
+        self.outlet_name = name
+
+    def get_customer_phone_number(self):
+        return self.customer_phone_number
+
+    def set_customer_phone_number(self, phone_number):
+        self.customer_phone_number = phone_number
+
+    def get_outlet_phone_number(self):
+        return self.outlet_phone_number
+
+    def set_outlet_phone_number(self, phone_number):
+        self.outlet_phone_number = phone_number
+
+    def get_outlet_address(self):
+        return self.outlet_address
+
+    def set_outlet_address(self, outlet_address):
+        self.outlet_address = outlet_address
 
     def get_all(self):
         return {

@@ -34,7 +34,12 @@ class LaundryOrderSerializer:
             'payment_method_id': order_dto.get_payment_method_id(),
             'payment_method_name': LaundryOrderSerializer._get_payment_method_name(order_dto.get_payment_method_id()),
             'laundry_receipts': order_dto.get_laundry_receipts(),
-            'review': order_dto.get_review()
+            'review': order_dto.get_review(),
+            'customer_name': order_dto.get_customer_name(),
+            'customer_phone_number': order_dto.get_customer_phone_number(),
+            'outlet_name': order_dto.get_outlet_name(),
+            'outlet_phone_number': order_dto.get_outlet_phone_number(),
+            'outlet_address': order_dto.get_outlet_address()
         }
 
 

@@ -25,5 +25,16 @@ def payment_method_with_id_exists(payment_method_id):
         return False
 
 
+def get_all_payment_methods():
+    raw_payment_methods = DATABASE[PAYMENT_METHOD].find({})
+
+    transformed_payment_methods = []
+    for raw_payment_method in raw_payment_methods:
+        payment_method = PaymentMethod()
+        payment_method.set_values_from_result(raw_payment_method)
+        transformed_payment_methods.append(payment_method)
+
+    return transformed_payment_methods
+
 
 

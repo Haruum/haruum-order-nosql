@@ -7,6 +7,7 @@ from haruum_order.settings import (
     OUTLET_ORDER_REGISTRATION_URL,
     OUTLET_GET_DATA_URL,
     CUSTOMER_CHECK_EXISTENCE_URL,
+    CUSTOMER_GET_DATA_URL,
 )
 from rest_framework import status
 from typing import List
@@ -86,21 +87,13 @@ def validate_customer_existence(customer_email: str):
 
 
 def get_outlet_data(outlet_email: str):
-    outlet_data_url = f'{OUTLET_GET_DATA_URL}{outlet_email}'
-
     try:
-        outlet_data_response = requests.get(outlet_data_url)
-        outlet_data = outlet_data_response.json()
+        return haruum_order_utils.request_get_and_return_response(
+            {'email': outlet_email},
+            OUTLET_GET_DATA_URL
+        )
 
-        if outlet_data_response.status_code == status.HTTP_400_BAD_REQUEST:
-            raise InvalidRequestException(outlet_data.get('message'))
-
-        if outlet_data_response.status_code != status.HTTP_200_OK:
-            raise FailedToFetchException(outlet_data.get('message'))
-
-        return outlet_data
-
-    except requests.exceptions.RequestException:
+    except FailedToFetchException:
         raise FailedToFetchException('Failed to validate outlet existence')
 
 
@@ -189,8 +182,70 @@ def create_order(request_data: dict):
     register_order(laundry_order)
 
 
+def merge_order_with_customer_data(order, customer_data):
+    order.set_customer_name(customer_data.get('name'))
+    order.set_customer_phone_number(customer_data.get('phone_number'))
+    return order
+
+
+def merge_order_receipt_with_item_name(order, outlet_service_categories):
+    order_receipts = order.get_laundry_receipts()
+
+    merged_order_receipts = []
+    for order_receipt in order_receipts:
+        category_id = order_receipt.get('item_category_provided_id')
+        item_category = find_matching_category(category_id, outlet_service_categories)
+
+        if item_category is not None:
+            merged_order_receipts.append({
+                **order_receipt,
+                'service_category_name': item_category.get('service_category_name')
+            })
+
+        else:
+            raise ObjectDoesNotExist(f'Service category with ID {category_id} does not exist')
+
+    order.set_laundry_receipts(merged_order_receipts)
+    return order
+
+
+def merge_order_with_outlet_data(order, outlet_data):
+    order.set_outlet_name(outlet_data.get('name'))
+    order.set_outlet_phone_number(outlet_data.get('phone_number'))
+    order.set_outlet_address(outlet_data.get('address'))
+    order_outlet_service_categories = outlet_data.get('items_provided')
+    order = merge_order_receipt_with_item_name(order, order_outlet_service_categories)
+    return order
+
+
+def merge_order_with_external_data(order: LaundryOrder):
+    customer_data = haruum_order_utils.request_get_and_return_response(
+        {'email': order.get_owning_customer_email()},
+        CUSTOMER_GET_DATA_URL
+    )
+
+    outlet_data = haruum_order_utils.request_get_and_return_response(
+        {'email': order.get_assigned_outlet_email()},
+        OUTLET_GET_DATA_URL
+    )
+
+    order = merge_order_with_customer_data(order, customer_data)
+    order = merge_order_with_outlet_data(order, outlet_data)
+    return order
+
+
+def merge_orders_with_additional_data(orders: List[LaundryOrder]):
+    merged_orders = []
+    for order in orders:
+        merged_order = merge_order_with_external_data(order)
+        merged_orders.append(merged_order)
+
+    return merged_orders
+
+
 def get_laundry_orders_of_outlet(request_data: dict):
-    return order_repository.get_orders_of_outlet(request_data.get('email'))
+    laundry_orders = order_repository.get_orders_of_outlet(request_data.get('email'))
+    return merge_orders_with_additional_data(laundry_orders)
 
 
 def validate_get_laundry_order_outlet_request(request_data):
@@ -201,7 +256,8 @@ def validate_get_laundry_order_outlet_request(request_data):
 @catch_exception_and_convert_to_invalid_request_decorator((ObjectDoesNotExist,))
 def get_laundry_order(request_data):
     validate_get_laundry_order_outlet_request(request_data)
-    return order_repository.get_order_by_id(request_data.get('laundry_order_id'))
+    laundry_order = order_repository.get_order_by_id(request_data.get('laundry_order_id'))
+    return merge_order_with_external_data(laundry_order)
 
 
 def get_active_laundry_orders_of_customer(request_data: dict):
@@ -211,7 +267,7 @@ def get_active_laundry_orders_of_customer(request_data: dict):
         returned_progress_status.get_id()
     )
 
-    return active_customer_orders
+    return merge_orders_with_additional_data(active_customer_orders)
 
 
 def get_completed_laundry_orders_of_customer(request_data: dict):
@@ -221,4 +277,4 @@ def get_completed_laundry_orders_of_customer(request_data: dict):
         returned_progress_status.get_id()
     )
 
-    return completed_customer_orders
+    return merge_orders_with_additional_data(completed_customer_orders)

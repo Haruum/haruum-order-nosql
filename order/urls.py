@@ -6,6 +6,7 @@ from .views import (
     serve_get_laundry_order_details,
     serve_get_active_laundry_orders_of_a_customer,
     serve_get_completed_laundry_orders_of_a_customer,
+    serve_get_all_payment_methods
 )
 
 
@@ -16,4 +17,5 @@ urlpatterns = [
     path('customer-orders/completed/', serve_get_completed_laundry_orders_of_a_customer),
     path('outlet-email/', serve_get_laundry_order_outlet_email),
     path('detail/', serve_get_laundry_order_details),
+    path('payment/all/', serve_get_all_payment_methods),
 ]

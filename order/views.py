@@ -3,7 +3,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .serializers.LaundryOrderSerializer import LaundryOrderSerializer
 from .serializers.LaundryOrderOutletEmailSerializer import LaundryOrderOutletEmailSerializer
-from .services import order
+from .serializers.PaymentMethodSerializer import PaymentMethodSerializer
+from .services import order, payment_method
 
 import json
 
@@ -116,3 +117,9 @@ def serve_get_completed_laundry_orders_of_a_customer(request):
     return Response(data=response_data)
 
 
+@require_GET
+@api_view(['GET'])
+def serve_get_all_payment_methods(request):
+    payment_methods = payment_method.handle_get_all_payment_method()
+    response_data = PaymentMethodSerializer(payment_methods, many=True).data
+    return Response(data=response_data)
